@@ -1,0 +1,60 @@
+RÉCAPITULATIF DU TP MONGODB (NAVICAT PREMIUM) – DONNÉES VÉLIB'
+===============================================================
+
+Fichier utilisé : velib-disponibilite-en-temps-reel.json (1 519 stations)
+Outil : Navicat Premium, connexion MongoDB (localhost:27017), base "Velib"
+
+Contenu du dossier
+------------------
+- Recapitulatif_TP_MongoDB.txt : ce document
+- requetes_mongodb.js          : toutes les requêtes exécutées
+- resultat_par_commune.csv     : résultat de l'agrégation (ouvrable dans Excel)
+- captures/                    : captures d'écran de Navicat
+
+ÉTAPE 1 – Import des données
+----------------------------
+- Création de la connexion MongoDB et de la base "Velib".
+- Import du fichier JSON avec l'Import Wizard de Navicat.
+- Renommage de la collection (qui portait le nom du fichier) en "stations".
+
+ÉTAPE 2 – Nettoyage des données
+-------------------------------
+Vérification, puis suppression des stations inutilisables
+(hors service ou sans capacité) :
+
+  db.stations.find({ $or: [ { is_renting: "NON" }, { capacity: 0 } ] })
+  db.stations.deleteMany({ $or: [ { is_renting: "NON" }, { capacity: 0 } ] })
+
+→ 67 stations supprimées, il en reste 1 452.
+
+ÉTAPE 3 – Agrégation par commune
+--------------------------------
+Nombre de stations, de vélos disponibles et de vélos électriques
+par commune, triés par nombre de vélos décroissant :
+
+  db.stations.aggregate([
+    { $group: {
+        _id: "$nom_arrondissement_communes",
+        nb_stations: { $sum: 1 },
+        velos_dispo: { $sum: "$numbikesavailable" },
+        velos_electriques: { $sum: "$ebike" }
+    }},
+    { $sort: { velos_dispo: -1 } }
+  ])
+
+Résultats
+---------
+69 communes au total. Les trois premières :
+- Paris : 935 stations, 11 733 vélos disponibles (dont 3 890 électriques)
+- Boulogne-Billancourt : 29 stations, 568 vélos (dont 108 électriques)
+- Ivry-sur-Seine : 18 stations, 366 vélos (dont 94 électriques)
+Autres exemples : Pantin (21 stations, 191 vélos dont 132 électriques),
+Saint-Ouen-sur-Seine (10 stations, 210 vélos dont 110 électriques).
+
+Difficultés rencontrées
+-----------------------
+1. La collection portait le nom du fichier, avec des tirets : "db.stations"
+   ne trouvait donc rien. Solution : renommer la collection en "stations".
+2. Erreur "SyntaxError: expected expression, got end of script" : seule une
+   partie de l'agrégation était sélectionnée au moment de l'exécution.
+   Solution : sélectionner la requête complète puis relancer.
